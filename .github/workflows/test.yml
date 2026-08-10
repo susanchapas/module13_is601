@@ -138,6 +138,7 @@ jobs:
   smoke:
     needs: push
     runs-on: ubuntu-latest
+    environment: production
     services:
       postgres:
         image: postgres:17
