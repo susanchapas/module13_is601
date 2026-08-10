@@ -1,6 +1,6 @@
 # Calculations API
 
-A FastAPI application with JWT authentication and a calculation store. Users register and log in from server-rendered pages; the browser keeps the access token in `localStorage` and sends it as a bearer token on every calculation request. Data lives in PostgreSQL through SQLAlchemy.
+FastAPI application with JWT authentication and a calculation store. Users register and log in from server-rendered pages; the browser keeps the access token in `localStorage` and sends it as a bearer token on every calculation request. Data lives in PostgreSQL through SQLAlchemy.
 
 ## Routes
 
