@@ -64,10 +64,16 @@ def read_health():
 # User Registration Endpoint
 # ------------------------------------------------------------------------------
 @app.post(
-    "/auth/register", 
-    response_model=UserResponse, 
+    "/auth/register",
+    response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
     tags=["auth"]
+)
+@app.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["auth"],
 )
 def register(user_create: UserCreate, db: Session = Depends(get_db)):
     # Exclude confirm_password before passing data to User.register
@@ -91,6 +97,7 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
 # User Login Endpoints
 # ------------------------------------------------------------------------------
 @app.post("/auth/login", response_model=TokenResponse, tags=["auth"])
+@app.post("/login", response_model=TokenResponse, tags=["auth"])
 def login_json(user_login: UserLogin, db: Session = Depends(get_db)):
     """Login with JSON payload"""
     auth_result = User.authenticate(db, user_login.username, user_login.password)

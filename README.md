@@ -11,8 +11,8 @@ FastAPI application with JWT authentication and a calculation store. Users regis
 | GET | `/register` | — | Registration page |
 | GET | `/dashboard` | — | Dashboard page |
 | GET | `/health` | — | Health check, used by Docker and CI |
-| POST | `/auth/register` | — | Create a user. 400 if the username or email exists |
-| POST | `/auth/login` | — | JSON login. Returns access and refresh tokens |
+| POST | `/auth/register`, `/register` | — | Create a user. 400 if the username or email exists |
+| POST | `/auth/login`, `/login` | — | JSON login. Returns access and refresh tokens |
 | POST | `/auth/token` | — | Form login for the Swagger UI |
 | POST | `/calculations` | Bearer | Compute and store a calculation |
 | GET | `/calculations` | Bearer | List the current user's calculations |
