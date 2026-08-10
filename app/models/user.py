@@ -1,19 +1,15 @@
 # app/models/user.py
 
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from sqlalchemy import Column, String, Boolean, DateTime, or_
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import relationship
 from app.core.config import get_settings
-from app.database import Base
+from app.database import Base, utcnow
 from app.models.calculation import Calculation
 
 settings = get_settings()
-
-def utcnow():
-    """Helper function to get current UTC datetime"""
-    return datetime.now(timezone.utc)
 
 class User(Base):
     """User model with authentication and token management capabilities."""

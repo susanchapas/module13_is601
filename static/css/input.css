@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        font-family: Arial, sans-serif;
+    }
+
+    header,
+    footer {
+        background-color: #f4f4f4;
+        padding: 1rem;
+        text-align: center;
+    }
+
+    nav a {
+        margin: 0 1rem;
+        color: #333;
+    }
+
+    main {
+        padding: 2rem;
+    }
+}

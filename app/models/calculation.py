@@ -1,12 +1,12 @@
 # app/models/calculation.py
-from datetime import datetime
 import uuid
+from functools import reduce
 from typing import List
 from sqlalchemy import Column, String, DateTime, ForeignKey, JSON, Float
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship, declared_attr
-from sqlalchemy.ext.declarative import declared_attr
-from app.database import Base
+from app.database import Base, utcnow
+from app.operations import add, subtract, multiply, divide
 
 class AbstractCalculation:
     """Abstract base class for calculations"""
@@ -58,17 +58,17 @@ class AbstractCalculation:
     @declared_attr
     def created_at(cls):
         return Column(
-            DateTime, 
-            default=datetime.utcnow,
+            DateTime(timezone=True),
+            default=utcnow,
             nullable=False
         )
 
     @declared_attr
     def updated_at(cls):
         return Column(
-            DateTime, 
-            default=datetime.utcnow,
-            onupdate=datetime.utcnow,
+            DateTime(timezone=True),
+            default=utcnow,
+            onupdate=utcnow,
             nullable=False
         )
 
@@ -90,9 +90,17 @@ class AbstractCalculation:
             raise ValueError(f"Unsupported calculation type: {calculation_type}")
         return calculation_class(user_id=user_id, inputs=inputs)
 
+    _operation = None
+
     def get_result(self) -> float:
-        """Method to compute calculation result"""
-        raise NotImplementedError
+        """Reduce the inputs with this calculation's arithmetic operation."""
+        if self._operation is None:
+            raise NotImplementedError
+        if not isinstance(self.inputs, list):
+            raise ValueError("Inputs must be a list of numbers.")
+        if len(self.inputs) < 2:
+            raise ValueError("Inputs must be a list with at least two numbers.")
+        return reduce(self._operation, self.inputs)
 
     def __repr__(self):
         return f"<Calculation(type={self.type}, inputs={self.inputs})>"
@@ -108,54 +116,19 @@ class Calculation(Base, AbstractCalculation):
 class Addition(Calculation):
     """Addition calculation"""
     __mapper_args__ = {"polymorphic_identity": "addition"}
-
-    def get_result(self) -> float:
-        if not isinstance(self.inputs, list):
-            raise ValueError("Inputs must be a list of numbers.")
-        if len(self.inputs) < 2:
-            raise ValueError("Inputs must be a list with at least two numbers.")
-        return sum(self.inputs)
+    _operation = staticmethod(add)
 
 class Subtraction(Calculation):
     """Subtraction calculation"""
     __mapper_args__ = {"polymorphic_identity": "subtraction"}
-
-    def get_result(self) -> float:
-        if not isinstance(self.inputs, list):
-            raise ValueError("Inputs must be a list of numbers.")
-        if len(self.inputs) < 2:
-            raise ValueError("Inputs must be a list with at least two numbers.")
-        result = self.inputs[0]
-        for value in self.inputs[1:]:
-            result -= value
-        return result
+    _operation = staticmethod(subtract)
 
 class Multiplication(Calculation):
     """Multiplication calculation"""
     __mapper_args__ = {"polymorphic_identity": "multiplication"}
-
-    def get_result(self) -> float:
-        if not isinstance(self.inputs, list):
-            raise ValueError("Inputs must be a list of numbers.")
-        if len(self.inputs) < 2:
-            raise ValueError("Inputs must be a list with at least two numbers.")
-        result = 1
-        for value in self.inputs:
-            result *= value
-        return result
+    _operation = staticmethod(multiply)
 
 class Division(Calculation):
     """Division calculation"""
     __mapper_args__ = {"polymorphic_identity": "division"}
-
-    def get_result(self) -> float:
-        if not isinstance(self.inputs, list):
-            raise ValueError("Inputs must be a list of numbers.")
-        if len(self.inputs) < 2:
-            raise ValueError("Inputs must be a list with at least two numbers.")
-        result = self.inputs[0]
-        for value in self.inputs[1:]:
-            if value == 0:
-                raise ValueError("Cannot divide by zero.")
-            result /= value
-        return result
+    _operation = staticmethod(divide)

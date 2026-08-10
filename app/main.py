@@ -1,4 +1,3 @@
-from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 from typing import List
@@ -18,7 +17,7 @@ from app.models.user import User
 from app.schemas.calculation import CalculationBase, CalculationResponse, CalculationUpdate
 from app.schemas.token import TokenResponse
 from app.schemas.user import UserCreate, UserResponse, UserLogin
-from app.database import get_db
+from app.database import get_db, utcnow
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -105,16 +104,11 @@ def login_json(user_login: UserLogin, db: Session = Depends(get_db)):
     user = auth_result["user"]
     db.commit()  # Commit the last_login update
 
-    # Ensure expires_at is timezone-aware
-    expires_at = auth_result["expires_at"]
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-
     return TokenResponse(
         access_token=auth_result["access_token"],
         refresh_token=auth_result["refresh_token"],
         token_type="bearer",
-        expires_at=expires_at,
+        expires_at=auth_result["expires_at"],
         user_id=user.id,
         username=user.username,
         email=user.email,
@@ -235,7 +229,7 @@ def update_calculation(
     if calculation_update.inputs is not None:
         calculation.inputs = calculation_update.inputs
         calculation.result = calculation.get_result()
-    calculation.updated_at = datetime.utcnow()
+    calculation.updated_at = utcnow()
     db.commit()
     db.refresh(calculation)
     return calculation
