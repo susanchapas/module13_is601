@@ -45,23 +45,23 @@ templates = Jinja2Templates(directory="templates")
 # Home page route
 @app.get("/", response_class=HTMLResponse, tags=["web"])
 def read_index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 # Login page route
 @app.get("/login", response_class=HTMLResponse, tags=["web"])
 def login_page(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse(request, "login.html")
 
 # Registration page route
 @app.get("/register", response_class=HTMLResponse, tags=["web"])
 def register_page(request: Request):
-    return templates.TemplateResponse("register.html", {"request": request})
+    return templates.TemplateResponse(request, "register.html")
 
 # Dashboard page Route
 
 @app.get("/dashboard", response_class=HTMLResponse, tags=["web"])
 def dashboard_page(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    return templates.TemplateResponse(request, "dashboard.html")
 
 # ------------------------------------------------------------------------------
 # Health Endpoint
