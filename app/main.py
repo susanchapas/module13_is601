@@ -81,7 +81,7 @@ def read_health():
 )
 def register(user_create: UserCreate, db: Session = Depends(get_db)):
     # Exclude confirm_password before passing data to User.register
-    user_data = user_create.dict(exclude={"confirm_password"})
+    user_data = user_create.model_dump(exclude={"confirm_password"})
     try:
         user = User.register(db, user_data)
         db.commit()
@@ -109,11 +109,9 @@ def login_json(user_login: UserLogin, db: Session = Depends(get_db)):
     db.commit()  # Commit the last_login update
 
     # Ensure expires_at is timezone-aware
-    expires_at = auth_result.get("expires_at")
-    if expires_at and expires_at.tzinfo is None:
+    expires_at = auth_result["expires_at"]
+    if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
-    else:
-        expires_at = datetime.now(timezone.utc) + timedelta(minutes=15)
 
     return TokenResponse(
         access_token=auth_result["access_token"],
