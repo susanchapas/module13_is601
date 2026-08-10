@@ -318,3 +318,78 @@ def test_model_division():
     with pytest.raises(ValueError):
         calc_zero = Calculation.create("division", dummy_user_id, [100, 0])
         calc_zero.get_result()
+
+# ---------------------------------------------------------------------------
+# Authentication State Tests
+# ---------------------------------------------------------------------------
+def _new_user_payload(prefix: str) -> dict:
+    suffix = uuid4().hex[:10]
+    return {
+        "first_name": "Auth",
+        "last_name": "State",
+        "email": f"{prefix}.{suffix}@example.com",
+        "username": f"{prefix}_{suffix}",
+        "password": "SecurePass123!",
+        "confirm_password": "SecurePass123!"
+    }
+
+def test_login_short_password_returns_401(base_url: str):
+    """A short password is a failed login, not a validation error."""
+    user_data = _new_user_payload("shortpw")
+    register_and_login(base_url, user_data)
+
+    response = requests.post(
+        f"{base_url}/auth/login",
+        json={"username": user_data["username"], "password": "abc"}
+    )
+    assert response.status_code == 401, f"Expected 401 but got {response.status_code}: {response.text}"
+    assert response.json()["detail"] == "Invalid username or password"
+
+def test_refresh_token_rejected_at_protected_route(base_url: str):
+    user_data = _new_user_payload("refreshtok")
+    token_data = register_and_login(base_url, user_data)
+
+    response = requests.get(
+        f"{base_url}/calculations",
+        headers={"Authorization": f"Bearer {token_data['refresh_token']}"}
+    )
+    assert response.status_code == 401, f"Expected 401 but got {response.status_code}: {response.text}"
+
+def test_deactivated_user_is_rejected(base_url: str, db_session):
+    from app.models.user import User
+
+    user_data = _new_user_payload("deactivated")
+    token_data = register_and_login(base_url, user_data)
+    headers = {"Authorization": f"Bearer {token_data['access_token']}"}
+
+    assert requests.get(f"{base_url}/calculations", headers=headers).status_code == 200
+
+    user = db_session.query(User).filter(User.username == user_data["username"]).first()
+    user.is_active = False
+    db_session.commit()
+
+    response = requests.get(f"{base_url}/calculations", headers=headers)
+    assert response.status_code == 400, f"Expected 400 but got {response.status_code}: {response.text}"
+    assert response.json()["detail"] == "Inactive user"
+
+def test_duplicate_registration_returns_400(base_url: str):
+    user_data = _new_user_payload("dupe")
+    assert requests.post(f"{base_url}/auth/register", json=user_data).status_code == 201
+
+    response = requests.post(f"{base_url}/auth/register", json=user_data)
+    assert response.status_code == 400, f"Expected 400 but got {response.status_code}: {response.text}"
+
+def test_form_login_persists_last_login(base_url: str, db_session):
+    from app.models.user import User
+
+    user_data = _new_user_payload("formlogin")
+    assert requests.post(f"{base_url}/auth/register", json=user_data).status_code == 201
+
+    response = requests.post(
+        f"{base_url}/auth/token",
+        data={"username": user_data["username"], "password": user_data["password"]}
+    )
+    assert response.status_code == 200, f"Form login failed: {response.text}"
+
+    user = db_session.query(User).filter(User.username == user_data["username"]).first()
+    assert user.last_login is not None

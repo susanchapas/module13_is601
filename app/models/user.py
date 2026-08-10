@@ -112,12 +112,12 @@ class User(Base):
             User: The newly created user instance
             
         Raises:
-            ValueError: If password is invalid or username/email already exists
+            ValueError: If the password is missing or username/email already exists
         """
         password = user_data.get("password")
-        if not password or len(password) < 6:
-            raise ValueError("Password must be at least 6 characters long")
-        
+        if not password:
+            raise ValueError("Password is required")
+
         # Check for duplicate email or username
         existing_user = db.query(cls).filter(
             or_(cls.email == user_data["email"], cls.username == user_data["username"])
@@ -207,26 +207,38 @@ class User(Base):
         return create_token(data["sub"], TokenType.REFRESH)
 
     @classmethod
-    def verify_token(cls, token: str):
+    def verify_token(cls, token: str, token_type=None):
         """
-        Verify a JWT token and return the user identifier.
-        
+        Verify a JWT token of the given type and return the user identifier.
+
         Args:
             token: JWT token to verify
-            
+            token_type: Expected TokenType, defaults to access
+
         Returns:
             UUID: User ID if token is valid, None otherwise
         """
-        from app.core.config import settings
         from jose import jwt, JWTError
+        from app.schemas.token import TokenType
+
+        if token_type is None:
+            token_type = TokenType.ACCESS
+
+        secret = (
+            settings.JWT_SECRET_KEY
+            if token_type == TokenType.ACCESS
+            else settings.JWT_REFRESH_SECRET_KEY
+        )
         try:
-            payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.ALGORITHM])
-            sub = payload.get("sub")
-            if sub is None:
-                return None
-            try:
-                return uuid.UUID(sub)
-            except (ValueError, TypeError):
-                return None
+            payload = jwt.decode(token, secret, algorithms=[settings.ALGORITHM])
         except JWTError:
+            return None
+
+        if payload.get("type") != token_type.value:
+            return None
+
+        sub = payload.get("sub")
+        try:
+            return uuid.UUID(sub)
+        except (ValueError, TypeError, AttributeError):
             return None

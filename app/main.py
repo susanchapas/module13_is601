@@ -1,17 +1,16 @@
-from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 from typing import List
 
-from fastapi import Body, FastAPI, Depends, HTTPException, status, Request, Form
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-
-import uvicorn
 
 from app.auth.dependencies import get_current_active_user
 from app.models.calculation import Calculation
@@ -19,28 +18,20 @@ from app.models.user import User
 from app.schemas.calculation import CalculationBase, CalculationResponse, CalculationUpdate
 from app.schemas.token import TokenResponse
 from app.schemas.user import UserCreate, UserResponse, UserLogin
-from app.database import Base, get_db, engine
+from app.database import get_db
 
-
-# Create tables on startup
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    print("Creating tables...")
-    Base.metadata.create_all(bind=engine)
-    print("Tables created successfully!")
-    yield
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 app = FastAPI(
     title="Calculations API",
     description="API for managing calculations",
     version="1.0.0",
-    lifespan=lifespan
 )
 # Mount the static files directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 
 # Set up Jinja2 templates directory
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
 # Home page route
 @app.get("/", response_class=HTMLResponse, tags=["web"])
@@ -90,6 +81,12 @@ def register(user_create: UserCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         db.rollback()
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username or email already exists"
+        )
 
 # ------------------------------------------------------------------------------
 # User Login Endpoints
@@ -137,6 +134,8 @@ def login_form(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = D
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    db.commit()  # Commit the last_login update
 
     return {
         "access_token": auth_result["access_token"],

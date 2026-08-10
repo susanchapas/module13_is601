@@ -101,15 +101,11 @@ class UserLogin(BaseModel):
     """Schema for user login"""
     username: str = Field(
         ...,
-        min_length=3,
-        max_length=50,
         example="johndoe",
         description="Username or email"
     )
     password: str = Field(
         ...,
-        min_length=8,
-        max_length=128,
         example="SecurePass123!",
         description="Password"
     )

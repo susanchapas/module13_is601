@@ -5,6 +5,7 @@ from uuid import UUID
 import pydantic_core
 from sqlalchemy.exc import IntegrityError
 from app.models.user import User
+from app.schemas.user import UserCreate
 
 def test_password_hashing(db_session, fake_user_data):
     """Test password hashing and verification functionality"""
@@ -126,20 +127,17 @@ def test_unique_email_username(db_session):
     with pytest.raises(ValueError, match="Username or email already exists"):
         User.register(db_session, user2_data)
 
-def test_short_password_registration(db_session):
-    """Test that registration fails with a short password"""
-    # Prepare test data with a 5-character password
-    test_data = {
-        "first_name": "Password",
-        "last_name": "Test",
-        "email": "short.pass@example.com",
-        "username": "shortpass",
-        "password": "Shor1"  # 5 characters, should fail
-    }
-    
-    # Attempt registration with short password
-    with pytest.raises(ValueError, match="Password must be at least 6 characters long"):
-        User.register(db_session, test_data)
+def test_short_password_rejected_by_schema():
+    """Password policy lives in the Pydantic schema, not the model"""
+    with pytest.raises(pydantic_core.ValidationError):
+        UserCreate(
+            first_name="Password",
+            last_name="Test",
+            email="short.pass@example.com",
+            username="shortpass",
+            password="Shor1",  # 5 characters, should fail
+            confirm_password="Shor1"
+        )
 
 def test_invalid_token():
     """Test that invalid tokens are rejected"""
@@ -190,7 +188,6 @@ def test_missing_password_registration(db_session):
         "username": "nopassworduser",
         # Password is missing
     }
-    
-    # Adjust the expected error message
-    with pytest.raises(ValueError, match="Password must be at least 6 characters long"):
+
+    with pytest.raises(ValueError, match="Password is required"):
         User.register(db_session, test_data)

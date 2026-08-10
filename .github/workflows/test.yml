@@ -40,6 +40,8 @@ jobs:
       - name: Install dependencies
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
+          JWT_SECRET_KEY: ci-access-secret-key-not-used-in-production
+          JWT_REFRESH_SECRET_KEY: ci-refresh-secret-key-not-used-in-production
         run: |
           python -m venv venv
           source venv/bin/activate
@@ -50,6 +52,8 @@ jobs:
       - name: Run tests
         env:
           DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
+          JWT_SECRET_KEY: ci-access-secret-key-not-used-in-production
+          JWT_REFRESH_SECRET_KEY: ci-refresh-secret-key-not-used-in-production
         run: |
           source venv/bin/activate
           
