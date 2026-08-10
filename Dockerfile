@@ -31,7 +31,9 @@ WORKDIR /app
 COPY --from=builder /wheels /wheels
 COPY requirements.txt .
 RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt && \
-    rm -rf /wheels
+    rm -rf /wheels && \
+    pip uninstall -y pip wheel && \
+    rm -rf /usr/local/lib/python3.10/ensurepip
 
 RUN groupadd -r appgroup && \
     useradd -r -g appgroup appuser
