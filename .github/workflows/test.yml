@@ -110,8 +110,6 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
-    outputs:
-      image: ${{ steps.push.outputs.image }}
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -124,7 +122,6 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Push the scanned image
-        id: push
         run: |
           set -euo pipefail
           docker load --input /tmp/image.tar
@@ -133,7 +130,6 @@ jobs:
           docker tag "$LOCAL_IMAGE" "$REPO:${{ github.sha }}"
           docker push "$REPO:latest"
           docker push "$REPO:${{ github.sha }}"
-          echo "image=$REPO:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
   smoke:
     needs: push
@@ -166,7 +162,7 @@ jobs:
             -e DATABASE_URL=postgresql://postgres:postgres@localhost:5432/fastapi_db \
             -e JWT_SECRET_KEY=smoke-access-secret-key \
             -e JWT_REFRESH_SECRET_KEY=smoke-refresh-secret-key \
-            "${{ needs.push.outputs.image }}"
+            "${{ secrets.DOCKERHUB_USERNAME }}/module13_is601:${{ github.sha }}"
 
       - name: Wait for /health
         run: |
