@@ -1,0 +1,6 @@
+# Vulnerabilities accepted because no fixed version exists yet.
+# Format: one CVE id per line, with the date it was accepted and why.
+# Review every entry when the base image is upgraded.
+#
+# Example:
+# CVE-0000-00000  # 2026-08-09 - no fix in debian bookworm, not reachable from our code

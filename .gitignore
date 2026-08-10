@@ -5,5 +5,7 @@ __pycache__/
 .coverage
 .pytest_cache
 htmlcov
+test-results/
+playwright-report/
 .env
 node_modules/

@@ -1,264 +1,120 @@
-# 📦 Project Setup
+# Calculations API
 
----
+A FastAPI application with JWT authentication and a calculation store. Users register and log in from server-rendered pages; the browser keeps the access token in `localStorage` and sends it as a bearer token on every calculation request. Data lives in PostgreSQL through SQLAlchemy.
 
-# 🧩 1. Install Homebrew (Mac Only)
+## Routes
 
-> Skip this step if you're on Windows.
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| GET | `/` | — | Home page |
+| GET | `/login` | — | Login page |
+| GET | `/register` | — | Registration page |
+| GET | `/dashboard` | — | Dashboard page |
+| GET | `/health` | — | Health check, used by Docker and CI |
+| POST | `/auth/register` | — | Create a user. 400 if the username or email exists |
+| POST | `/auth/login` | — | JSON login. Returns access and refresh tokens |
+| POST | `/auth/token` | — | Form login for the Swagger UI |
+| POST | `/calculations` | Bearer | Compute and store a calculation |
+| GET | `/calculations` | Bearer | List the current user's calculations |
+| GET | `/calculations/{id}` | Bearer | Read one calculation |
+| PUT | `/calculations/{id}` | Bearer | Update the inputs and recompute |
+| DELETE | `/calculations/{id}` | Bearer | Delete a calculation |
 
-Homebrew is a package manager for macOS.  
-You’ll use it to easily install Git, Python, Docker, etc.
+Calculation types: `addition`, `subtraction`, `multiplication`, `division`.
 
-**Install Homebrew:**
+Interactive docs: `/docs`.
 
-```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-**Verify Homebrew:**
-
-```bash
-brew --version
-```
-
-If you see a version number, you're good to go.
-
----
-
-# 🧩 2. Install and Configure Git
-
-## Install Git
-
-- **MacOS (using Homebrew)**
+## Run with Docker Compose
 
 ```bash
-brew install git
+cp .env.example .env
+# JWT_SECRET_KEY and JWT_REFRESH_SECRET_KEY are required and have no defaults
+openssl rand -hex 32   # paste into each key in .env
+
+docker compose up --build
 ```
 
-- **Windows**
-
-Download and install [Git for Windows](https://git-scm.com/download/win).  
-Accept the default options during installation.
-
-**Verify Git:**
+The app is on http://localhost:8000 and PostgreSQL on port 5432. `docker-compose.override.yml` is applied automatically for development: it bind-mounts the repository and runs uvicorn with `--reload`. For a production-like run that uses only the image contents:
 
 ```bash
-git --version
+docker compose -f docker-compose.yml up --build
 ```
 
----
-
-## Configure Git Globals
-
-Set your name and email so Git tracks your commits properly:
+## Run locally
 
 ```bash
-git config --global user.name "Your Name"
-git config --global user.email "your_email@example.com"
+python -m venv venv && source venv/bin/activate
+pip install -r requirements-dev.txt   # requirements.txt is runtime only
+playwright install --with-deps chromium
+
+docker compose up -d db          # or point DATABASE_URL at your own PostgreSQL
+python -m app.database_init      # creates the tables
+uvicorn app.main:app --reload
 ```
 
-Confirm the settings:
+Styles are Tailwind, compiled ahead of time into `static/css/tailwind.css`. After changing a template or `static/css/input.css`:
 
 ```bash
-git config --list
+npm install
+npm run build:css
 ```
 
----
+## Tests
 
-## Generate SSH Keys and Connect to GitHub
-
-> Only do this once per machine.
-
-1. Generate a new SSH key:
+`pytest.ini` already enables coverage over `app/`. The e2e tier starts its own uvicorn subprocess and drives Chromium with Playwright, so the database must be reachable.
 
 ```bash
-ssh-keygen -t ed25519 -C "your_email@example.com"
+pytest                     # all tiers
+pytest tests/unit          # pure operation logic
+pytest tests/integration   # models, schemas, and auth against a real database
+pytest tests/e2e           # browser tests, positive and negative
 ```
 
-(Press Enter at all prompts.)
+Useful options: `--preserve-db` keeps the tables after the run, `--run-slow` includes tests marked slow.
 
-2. Start the SSH agent:
+When an e2e test fails, a full-page screenshot and a Playwright trace are written to `test-results/`. Open a trace with:
 
 ```bash
-eval "$(ssh-agent -s)"
+playwright show-trace test-results/<test_name>.trace.zip
 ```
 
-3. Add the SSH private key to the agent:
+Coverage HTML lands in `htmlcov/`.
 
-```bash
-ssh-add ~/.ssh/id_ed25519
+## CI/CD
+
+`.github/workflows/test.yml` runs on every push and pull request to `main`:
+
+```
+test → build → scan → push → smoke
 ```
 
-4. Copy your SSH public key:
+- **test** — installs dependencies, runs every tier against a PostgreSQL service, uploads `test-results/` and `htmlcov/` even on failure.
+- **build** — builds the image once and saves it as a workflow artifact.
+- **scan** — loads that exact image and fails on CRITICAL or HIGH vulnerabilities that have a fix. Accepted findings go in `.trivyignore` with a date and a reason.
+- **push** — `main` only. Pushes the scanned image, so the scanned bytes are the published bytes, tagged `latest` and the commit SHA.
+- **smoke** — runs the published image against PostgreSQL, waits for `/health`, then registers and logs in over HTTP.
 
-- **Mac/Linux:**
+### Required GitHub secrets
 
-```bash
-cat ~/.ssh/id_ed25519.pub | pbcopy
-```
+| Secret | Purpose |
+|---|---|
+| `DOCKERHUB_USERNAME` | Docker Hub account. Also the image namespace: `<username>/module13_is601` |
+| `DOCKERHUB_TOKEN` | Docker Hub access token with write scope |
 
-- **Windows (Git Bash):**
+The `push` job targets the `production` environment, so add both secrets there if that environment restricts them.
 
-```bash
-cat ~/.ssh/id_ed25519.pub | clip
-```
+## Configuration
 
-5. Add the key to your GitHub account:
-   - Go to [GitHub SSH Settings](https://github.com/settings/keys)
-   - Click **New SSH Key**, paste the key, save.
+All settings come from the environment or `.env` (see `.env.example`).
 
-6. Test the connection:
+| Variable | Default | Notes |
+|---|---|---|
+| `DATABASE_URL` | local PostgreSQL | SQLAlchemy connection string |
+| `JWT_SECRET_KEY` | — | Required. Signs access tokens |
+| `JWT_REFRESH_SECRET_KEY` | — | Required. Signs refresh tokens |
+| `ALGORITHM` | `HS256` | JWT signing algorithm |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | Access token lifetime |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | `7` | Refresh token lifetime |
+| `BCRYPT_ROUNDS` | `12` | Password hashing cost |
 
-```bash
-ssh -T git@github.com
-```
-
-You should see a success message.
-
----
-
-# 🧩 3. Clone the Repository
-
-Now you can safely clone the course project:
-
-```bash
-git clone <repository-url>
-cd <repository-directory>
-```
-
----
-
-# 🛠️ 4. Install Python 3.10+
-
-## Install Python
-
-- **MacOS (Homebrew)**
-
-```bash
-brew install python
-```
-
-- **Windows**
-
-Download and install [Python for Windows](https://www.python.org/downloads/).  
-✅ Make sure you **check the box** `Add Python to PATH` during setup.
-
-**Verify Python:**
-
-```bash
-python3 --version
-```
-or
-```bash
-python --version
-```
-
----
-
-## Create and Activate a Virtual Environment
-
-(Optional but recommended)
-
-```bash
-python3 -m venv venv
-source venv/bin/activate   # Mac/Linux
-venv\Scripts\activate.bat  # Windows
-```
-
-### Install Required Packages
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-# 🐳 5. (Optional) Docker Setup
-
-> Skip if Docker isn't used in this module.
-
-## Install Docker
-
-- [Install Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
-- [Install Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
-
-## Build Docker Image
-
-```bash
-docker build -t <image-name> .
-```
-
-## Run Docker Container
-
-```bash
-docker run -it --rm <image-name>
-```
-
----
-
-# 🚀 6. Running the Project
-
-- **Without Docker**:
-
-```bash
-python main.py
-```
-
-(or update this if the main script is different.)
-
-- **With Docker**:
-
-```bash
-docker run -it --rm <image-name>
-```
-
----
-
-# 📝 7. Submission Instructions
-
-After finishing your work:
-
-```bash
-git add .
-git commit -m "Complete Module X"
-git push origin main
-```
-
-Then submit the GitHub repository link as instructed.
-
----
-
-# 🔥 Useful Commands Cheat Sheet
-
-| Action                         | Command                                          |
-| ------------------------------- | ------------------------------------------------ |
-| Install Homebrew (Mac)          | `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"` |
-| Install Git                     | `brew install git` or Git for Windows installer |
-| Configure Git Global Username  | `git config --global user.name "Your Name"`      |
-| Configure Git Global Email     | `git config --global user.email "you@example.com"` |
-| Clone Repository                | `git clone <repo-url>`                          |
-| Create Virtual Environment     | `python3 -m venv venv`                           |
-| Activate Virtual Environment   | `source venv/bin/activate` / `venv\Scripts\activate.bat` |
-| Install Python Packages        | `pip install -r requirements.txt`               |
-| Build Docker Image              | `docker build -t <image-name> .`                |
-| Run Docker Container            | `docker run -it --rm <image-name>`               |
-| Push Code to GitHub             | `git add . && git commit -m "message" && git push` |
-
----
-
-# 📋 Notes
-
-- Install **Homebrew** first on Mac.
-- Install and configure **Git** and **SSH** before cloning.
-- Use **Python 3.10+** and **virtual environments** for Python projects.
-- **Docker** is optional depending on the project.
-
----
-
-# 📎 Quick Links
-
-- [Homebrew](https://brew.sh/)
-- [Git Downloads](https://git-scm.com/downloads)
-- [Python Downloads](https://www.python.org/downloads/)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [GitHub SSH Setup Guide](https://docs.github.com/en/authentication/connecting-to-github-with-ssh)
+Never commit a real `.env`; it is git-ignored.

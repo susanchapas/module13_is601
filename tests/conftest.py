@@ -2,6 +2,7 @@ import socket
 import subprocess
 import time
 import logging
+from pathlib import Path
 from typing import Generator, Dict, List
 from contextlib import contextmanager
 
@@ -231,21 +232,32 @@ def browser_context():
             logger.info("Closing Playwright browser.")
             browser.close()
 
+ARTIFACT_DIR = Path("test-results")
+
 @pytest.fixture
-def page(browser_context: Browser):
+def page(browser_context: Browser, request):
     """
     Provide a new browser page for each test, with a standard viewport.
-    Closes the page and context after each test.
+    On failure, a screenshot and a Playwright trace are written to test-results/.
     """
     context = browser_context.new_context(
         viewport={'width': 1920, 'height': 1080},
         ignore_https_errors=True
     )
+    context.tracing.start(screenshots=True, snapshots=True, sources=True)
     page = context.new_page()
     logger.info("New browser page created.")
     try:
         yield page
     finally:
+        report = getattr(request.node, "rep_call", None)
+        if report is not None and report.failed:
+            ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+            page.screenshot(path=str(ARTIFACT_DIR / f"{request.node.name}.png"), full_page=True)
+            context.tracing.stop(path=str(ARTIFACT_DIR / f"{request.node.name}.trace.zip"))
+            logger.info(f"Saved failure artifacts for {request.node.name}.")
+        else:
+            context.tracing.stop()
         logger.info("Closing browser page and context.")
         page.close()
         context.close()
@@ -261,6 +273,12 @@ def pytest_addoption(parser):
     """
     parser.addoption("--preserve-db", action="store_true", help="Keep test database after tests")
     parser.addoption("--run-slow", action="store_true", help="Run tests marked as slow")
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_makereport(item, call):
+    """Expose each phase's report on the item so fixtures can see test failures."""
+    outcome = yield
+    setattr(item, f"rep_{call.when}", outcome.get_result())
 
 def pytest_collection_modifyitems(config, items):
     """

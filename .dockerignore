@@ -7,5 +7,10 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
+test-results/
+playwright-report/
+tests/
+node_modules/
 .DS_Store
 .env
+implementation.md
