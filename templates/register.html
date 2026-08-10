@@ -105,11 +105,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Helper function to validate password strength
+    // Mirrors the server-side rules in app/schemas/user.py
     function isValidPassword(password) {
-        return password.length >= 8 && // at least 8 characters
-               /[A-Z]/.test(password) && // at least one uppercase
-               /[a-z]/.test(password) && // at least one lowercase
-               /[0-9]/.test(password); // at least one number
+        return password.length >= 8 &&
+               /[A-Z]/.test(password) &&
+               /[a-z]/.test(password) &&
+               /[0-9]/.test(password) &&
+               /[!@#$%^&*()_+\-=\[\]{}|;:,.<>?]/.test(password);
     }
 
     form.addEventListener('submit', async function(e) {
@@ -141,7 +143,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (!isValidPassword(formData.password)) {
-            showError('Password must be at least 8 characters long and contain uppercase, lowercase, and numbers');
+            showError('Password must be at least 8 characters long and contain uppercase, lowercase, a number, and a special character');
             return;
         }
 
@@ -162,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.detail || 'Registration failed');
+                throw new Error(apiError(data, 'Registration failed'));
             }
 
             // Show success message
