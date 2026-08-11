@@ -45,7 +45,7 @@ jobs:
           playwright install --with-deps chromium
 
       - name: Run tests
-        run: pytest --junitxml=test-results/junit.xml
+        run: pytest --junitxml=test-results/junit.xml --cov-fail-under=100
 
       - name: Upload test artifacts
         if: always()

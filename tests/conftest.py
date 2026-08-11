@@ -1,5 +1,8 @@
+import os
+import signal
 import socket
 import subprocess
+import sys
 import time
 import logging
 from pathlib import Path
@@ -187,11 +190,12 @@ def fastapi_server():
     logger.info(f"Starting FastAPI server on port {base_port}...")
 
     process = subprocess.Popen(
-        ['uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(base_port)],
-        stdout=subprocess.PIPE,
+        [sys.executable, '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(base_port)],
+        stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
         text=True,
-        cwd='.'  # ensure the working directory is set correctly
+        cwd='.',  # ensure the working directory is set correctly
+        env={**os.environ, 'COVERAGE_PROCESS_START': str(Path('.coveragerc').resolve())},
     )
 
     # IMPORTANT: Use the /health endpoint for the check!
@@ -206,7 +210,9 @@ def fastapi_server():
     yield server_url
 
     logger.info("Stopping test server...")
-    process.terminate()
+    # SIGINT, not SIGTERM: uvicorn re-raises the captured signal with the default
+    # handler, and SIGTERM's default kills the process before coverage can save.
+    process.send_signal(signal.SIGINT)
     try:
         process.wait(timeout=5)
         logger.info("Test server stopped.")
